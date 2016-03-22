@@ -46,6 +46,8 @@ params = {
     "searchString": "",
     "dateRange": ""
 }
+
+titles = []
  
 
 def wait_for(condition_function):
@@ -141,41 +143,44 @@ if __name__ == "__main__":
 
                 print(title)
 
-                file_prefix = os.path.join(out_dir, title)
+                if title not in titles:
 
-                headline = driver.find_elements_by_css_selector('.article-page h1')
-                headline = headline[0].text
+                    titles.append(title)
 
-                lead = driver.find_elements_by_css_selector('.lead-text h2')
-                lead = lead[0].text
+                    file_prefix = os.path.join(out_dir, title)
 
-                article_paragraphs = driver.find_elements_by_css_selector('div.body[itemprop=articleBody] p')
-                article_text = "\n".join([p.text for p in article_paragraphs])
+                    headline = driver.find_elements_by_css_selector('.article-page h1')
+                    headline = headline[0].text
 
-                with open('%s.txt' % (file_prefix), 'w') as text_file:
-                    text_file.write('%s\n\n' % headline)
-                    text_file.write('%s\n\n' % lead)
-                    text_file.write('%s' % article_text)
+                    lead = driver.find_elements_by_css_selector('.lead-text h2')
+                    lead = lead[0].text
 
-                page_code = driver.execute_script("return document.documentElement.innerHTML;")
-                with open('%s.html' % (file_prefix), 'w') as html_file:
-                    html_file.write(page_code)
+                    article_paragraphs = driver.find_elements_by_css_selector('div.body[itemprop=articleBody] p')
+                    article_text = "\n".join([p.text for p in article_paragraphs])
 
-                page_height = driver.execute_script("return document.body.scrollHeight;")
-                window_height = driver.execute_script("return window.innerHeight - 200;")
+                    with open('%s.txt' % (file_prefix), 'w') as text_file:
+                        text_file.write('%s\n\n' % headline)
+                        text_file.write('%s\n\n' % lead)
+                        text_file.write('%s' % article_text)
 
-                total_scrolled = window_height
-                
-                count = 0
-                driver.save_screenshot('%s-%d.png' % (file_prefix, count))
+                    page_code = driver.execute_script("return document.documentElement.innerHTML;")
+                    with open('%s.html' % (file_prefix), 'w') as html_file:
+                        html_file.write(page_code)
 
-                while(total_scrolled <= page_height):
-                    count += 1
-                    driver.execute_script('window.scrollTo(0, %d);' % (count * window_height))
-                    time.sleep(1)
+                    page_height = driver.execute_script("return document.body.scrollHeight;")
+                    window_height = driver.execute_script("return window.innerHeight - 200;")
+
+                    total_scrolled = window_height
+                    
+                    count = 0
                     driver.save_screenshot('%s-%d.png' % (file_prefix, count))
-                    total_scrolled += window_height
 
+                    while(total_scrolled <= page_height):
+                        count += 1
+                        driver.execute_script('window.scrollTo(0, %d);' % (count * window_height))
+                        time.sleep(1)
+                        driver.save_screenshot('%s-%d.png' % (file_prefix, count))
+                        total_scrolled += window_height
 
     driver.quit()
 
