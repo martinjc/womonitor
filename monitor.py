@@ -6,6 +6,7 @@ import urllib
 
 from datetime import date, datetime
 from selenium import webdriver
+from selenium.common.exceptions import StaleElementReferenceException
 
 wales_online_page = 'http://www.walesonline.co.uk/'
 
@@ -27,10 +28,22 @@ params = {
     "articleTypes": " news opinion advice live-event ive-event-clone",
     "pageNumber": 1,
     "pageLength": 1000,
-    "searchString": "test",
-    "dateRange": "2016-03-03T00:00:001Z TO 2016-03-08T23:59:59Z"
+    "searchString": "",
+    "dateRange": ""
 }
-    
+ 
+
+def wait_for(condition_function):
+    start_time = time.time()
+    while time.time() < start_time + 3:
+        if condition_function():
+            return True
+        else:
+            time.sleep(0.1)
+    raise Exception(
+        'Timeout waiting for {}'.format(condition_function.__name__)
+    )
+
 
 if __name__ == "__main__":
 
@@ -45,20 +58,9 @@ if __name__ == "__main__":
     if not os.path.isdir(today_dir):
         os.makedirs(today_dir)
 
-    # driver = webdriver.Chrome()
-    # driver.implicitly_wait(10)
-    # driver.maximize_window()
-    
-    # only want to access a page once every 2 seconds 
-    #so we don't thrash the mfp server too much
-    earliest_query_time = time.time()
-    query_interval = 4
-
-    # driver.get(simple_search_url)
-
-    data = urllib.parse.urlencode(params)
-
-    print('%s?%s' % (base_url, data))
+    driver = webdriver.Chrome()
+    driver.implicitly_wait(10)
+    driver.maximize_window()
 
     date_from = '2016-03-03 00:00:00'
     date_to = '2016-03-08 23:59:59'
@@ -71,29 +73,49 @@ if __name__ == "__main__":
 
     date_range = "%s TO %s" % (dt_from_str, dt_to_str)
 
-    print(date_range)
+    params['dateRange'] = date_range
+    params['searchString'] = "rugby"
 
-    # driver.quit()
-    sys.exit(0)
+    data = urllib.parse.urlencode(params)
+    search_url = '%s?%s' % (base_url, data)
 
-    page_list = driver.find_elements_by_css_selector('ul li a')
+    driver.get(search_url)
+    
+    page_list = driver.find_elements_by_css_selector('.article.ma-teaser h3 a')
     page_addresses = []
     for page in page_list:
         page_addresses.append(page.get_attribute('href'))
 
+    next_button = driver.find_elements_by_css_selector('.pagination a[rel=next].ir')
+
+    while len(next_button) > 0:
+
+        next_button[0].click()
+
+        def link_has_gone_stale():
+            try:
+                # poll the link with an arbitrary call
+                next_button[0].find_elements_by_id('doesnt-matter') 
+                return False
+            except StaleElementReferenceException:
+                return True        
+
+        wait_for(link_has_gone_stale)
+
+        new_page_list = driver.find_elements_by_css_selector('.article.ma-teaser h3 a')
+        for page in new_page_list:
+            page_addresses.append(page.get_attribute('href'))
+        next_button = driver.find_elements_by_css_selector('.pagination a[rel=next].ir')
+    
+    print(page_addresses)
+    print(len(page_addresses))
+
     for page_address in page_addresses:
 
-        # go to sleep for as long as necessary to avoid making more than 
-        # one call to the website every 2 seconds
-        while time.time() < earliest_query_time:
-            sleep_dur = earliest_query_time - time.time()
-            print(sleep_dur)
-            if sleep_dur > 0:
-                time.sleep(sleep_dur)
-
-        earliest_query_time = time.time() + (query_interval)
-
         driver.get(page_address)
+
+        byline_time = driver.find_elements_by_css_selector('time.byline-time')
+
         messages = driver.find_elements_by_css_selector('.normalgroup a')
         
         message_addresses = []
