@@ -6,13 +6,28 @@ import urllib
 
 from datetime import date, datetime
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import StaleElementReferenceException
 
 wales_online_page = 'http://www.walesonline.co.uk/'
 
-weeks = [
-    {"from": "2016-03-04", "to": "2016-03-08"}
+dev_weeks = [
+    {"from": "2016-03-04", "to": "2016-03-08"},
+    {"from": "2016-02-12", "to": "2016-02-18"},
 ]
+
+weeks = [
+    {"from": "2016-04-04", "to": "2016-04-08"},
+    {"from": "2016-04-18", "to": "2016-04-22"},
+    {"from": "2016-05-02", "to": "2016-05-06"},
+    {"from": "2016-05-16", "to": "2016-05-20"},
+    {"from": "2016-05-30", "to": "2016-06-03"},
+    {"from": "2016-06-13", "to": "2016-06-17"},
+    {"from": "2016-06-27", "to": "2016-07-01"},
+    {"from": "2016-07-11", "to": "2016-07-15"},
+]
+
+terms = ['poverty', 'economic', 'financial', 'impoverish']
 
 start_day = "00:00:00"
 end_day = "23:59:59"
@@ -50,98 +65,117 @@ if __name__ == "__main__":
     # current working directory
     cwd = os.getcwd()
 
-    # get todays date
-    today = date.today().isoformat()
+    chrome_options = Options()
+    chrome_options.add_extension('adblockpluschrome.crx')
 
-    # if no directory for today, make one
-    today_dir = os.path.join(cwd, today)
-    if not os.path.isdir(today_dir):
-        os.makedirs(today_dir)
-
-    driver = webdriver.Chrome()
-    driver.implicitly_wait(10)
+    # start a webbrowser
+    driver = webdriver.Chrome(chrome_options=chrome_options)
+    driver.implicitly_wait(5)
     driver.maximize_window()
 
-    date_from = '2016-03-03 00:00:00'
-    date_to = '2016-03-08 23:59:59'
+    for week in dev_weeks:
 
-    dt_from = datetime.strptime(date_from, "%Y-%m-%d %H:%M:%S")
-    dt_from_str = '%sZ' % dt_from.isoformat()
+        date_from = '%s %s' % (week['from'], start_day)
+        date_to = '%s %s' % (week['to'], end_day)
 
-    dt_to = datetime.strptime(date_to, "%Y-%m-%d %H:%M:%S")
-    dt_to_str = '%sZ' % dt_to.isoformat()
+        dt_from = datetime.strptime(date_from, "%Y-%m-%d %H:%M:%S")
+        dt_from_str = '%sZ' % dt_from.isoformat()
 
-    date_range = "%s TO %s" % (dt_from_str, dt_to_str)
+        dt_to = datetime.strptime(date_to, "%Y-%m-%d %H:%M:%S")
+        dt_to_str = '%sZ' % dt_to.isoformat()
 
-    params['dateRange'] = date_range
-    params['searchString'] = "rugby"
+        date_range = "%s TO %s" % (dt_from_str, dt_to_str)
 
-    data = urllib.parse.urlencode(params)
-    search_url = '%s?%s' % (base_url, data)
+        out_dir = '%s to %s' % (dt_from.date().isoformat(), dt_to.date().isoformat())
 
-    driver.get(search_url)
-    
-    page_list = driver.find_elements_by_css_selector('.article.ma-teaser h3 a')
-    page_addresses = []
-    for page in page_list:
-        page_addresses.append(page.get_attribute('href'))
+        # if no directory for today, make one
+        out_dir = os.path.join(cwd, out_dir)
+        if not os.path.isdir(out_dir):
+            os.makedirs(out_dir)
 
-    next_button = driver.find_elements_by_css_selector('.pagination a[rel=next].ir')
+        params['dateRange'] = date_range
 
-    while len(next_button) > 0:
+        for term in terms:
+            params['searchString'] = term
 
-        next_button[0].click()
+            data = urllib.parse.urlencode(params)
+            search_url = '%s?%s' % (base_url, data)
 
-        def link_has_gone_stale():
-            try:
-                # poll the link with an arbitrary call
-                next_button[0].find_elements_by_id('doesnt-matter') 
-                return False
-            except StaleElementReferenceException:
-                return True        
+            driver.get(search_url)
+            
+            page_list = driver.find_elements_by_css_selector('.article.ma-teaser h3 a')
+            page_addresses = []
+            for page in page_list:
+                page_addresses.append(page.get_attribute('href'))
 
-        wait_for(link_has_gone_stale)
+            next_button = driver.find_elements_by_css_selector('.pagination a[rel=next].ir')
 
-        new_page_list = driver.find_elements_by_css_selector('.article.ma-teaser h3 a')
-        for page in new_page_list:
-            page_addresses.append(page.get_attribute('href'))
-        next_button = driver.find_elements_by_css_selector('.pagination a[rel=next].ir')
-    
-    print(page_addresses)
-    print(len(page_addresses))
+            while len(next_button) > 0:
 
-    for page_address in page_addresses:
+                next_button[0].click()
 
-        driver.get(page_address)
+                def link_has_gone_stale():
+                    try:
+                        # poll the link with an arbitrary call
+                        next_button[0].find_elements_by_id('doesnt-matter') 
+                        return False
+                    except StaleElementReferenceException:
+                        return True        
 
-        byline_time = driver.find_elements_by_css_selector('time.byline-time')
+                wait_for(link_has_gone_stale)
 
-        messages = driver.find_elements_by_css_selector('.normalgroup a')
-        
-        message_addresses = []
-        for message in messages:
-            message_addresses.append(message.get_attribute('href'))
+                new_page_list = driver.find_elements_by_css_selector('.article.ma-teaser h3 a')
+                for page in new_page_list:
+                    page_addresses.append(page.get_attribute('href'))
+                next_button = driver.find_elements_by_css_selector('.pagination a[rel=next].ir')
+            
+            print(page_addresses)
+            print(len(page_addresses))
 
-        for message_address in message_addresses:
-            p = string.find(message_address, 'P=')
-            p = message_address[p+2:]
-            print(p)
+            for page_address in page_addresses:
 
-            if not '%s.html' % p in files:
+                driver.get(page_address)
 
-                # go to sleep for as long as necessary to avoid making more than 
-                # one call to the website every 2 seconds
-                while time.time() < earliest_query_time:
-                    sleep_dur = earliest_query_time - time.time()
-                    if sleep_dur > 0:
-                        time.sleep(sleep_dur)
+                title_loc = page_address.rfind('/')
+                title = page_address[title_loc+1:]
 
-                earliest_query_time = time.time() + (query_interval)
+                print(title)
 
-                driver.get(message_address)
+                file_prefix = os.path.join(out_dir, title)
+
+                headline = driver.find_elements_by_css_selector('.article-page h1')
+                headline = headline[0].text
+
+                lead = driver.find_elements_by_css_selector('.lead-text h2')
+                lead = lead[0].text
+
+                article_paragraphs = driver.find_elements_by_css_selector('div.body[itemprop=articleBody] p')
+                article_text = "\n".join([p.text for p in article_paragraphs])
+
+                with open('%s.txt' % (file_prefix), 'w') as text_file:
+                    text_file.write('%s\n\n' % headline)
+                    text_file.write('%s\n\n' % lead)
+                    text_file.write('%s' % article_text)
+
                 page_code = driver.execute_script("return document.documentElement.innerHTML;")
-                with open('%s.html' % (p), 'w') as output_file:
-                    output_file.write(page_code.encode('utf-8'))
+                with open('%s.html' % (file_prefix), 'w') as html_file:
+                    html_file.write(page_code)
+
+                page_height = driver.execute_script("return document.body.scrollHeight;")
+                window_height = driver.execute_script("return window.innerHeight - 200;")
+
+                total_scrolled = window_height
+                
+                count = 0
+                driver.save_screenshot('%s-%d.png' % (file_prefix, count))
+
+                while(total_scrolled <= page_height):
+                    count += 1
+                    driver.execute_script('window.scrollTo(0, %d);' % (count * window_height))
+                    time.sleep(1)
+                    driver.save_screenshot('%s-%d.png' % (file_prefix, count))
+                    total_scrolled += window_height
+
 
     driver.quit()
 
